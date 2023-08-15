@@ -3,7 +3,9 @@
 namespace App\Repository;
 
 use App\Entity\Blog;
+use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -16,33 +18,51 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class BlogRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry)
+    private $manager;
+
+    public function __construct(ManagerRegistry $registry, EntityManagerInterface $manager)
     {
         parent::__construct($registry, Blog::class);
+        $this->manager = $manager;
     }
 
-//    /**
-//     * @return Blog[] Returns an array of Blog objects
-//     */
-//    public function findByExampleField($value): array
-//    {
-//        return $this->createQueryBuilder('b')
-//            ->andWhere('b.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->orderBy('b.id', 'ASC')
-//            ->setMaxResults(10)
-//            ->getQuery()
-//            ->getResult()
-//        ;
-//    }
+    public function saveBlog($title, $body, $authorId): Blog
+    {
+        $blog = new Blog();
 
-//    public function findOneBySomeField($value): ?Blog
-//    {
-//        return $this->createQueryBuilder('b')
-//            ->andWhere('b.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->getQuery()
-//            ->getOneOrNullResult()
-//        ;
-//    }
+        $blog
+            ->setTitle($title)
+            ->setBody($body)
+            ->setAuthorId($authorId)
+            ->setCreatedAt(new DateTimeImmutable());
+
+        $this->manager->persist($blog);
+        $this->manager->flush();
+
+        return $blog;
+    }
+
+    public function updateBlog($id, $title, $body): Blog
+    {
+        $blog = BlogRepository::find($id);
+
+        $blog->setTitle($title)->setBody($body);
+
+        $this->manager->persist($blog);
+        $this->manager->flush();
+
+        return $blog;
+    }
+
+    public function deleteBlog($id)
+    {
+        $blog = BlogRepository::find($id);
+
+        $blog->setDeletedAt(new DateTimeImmutable());
+
+        $this->manager->persist($blog);
+        $this->manager->flush();
+
+        return true;
+    }
 }
