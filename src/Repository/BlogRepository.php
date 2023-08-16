@@ -26,7 +26,7 @@ class BlogRepository extends ServiceEntityRepository
         $this->manager = $manager;
     }
 
-    public function saveBlog($title, $body, $authorId): Blog
+    public function saveBlog($title, $body, $authorId, $publishDate): Blog
     {
         $blog = new Blog();
 
@@ -34,7 +34,8 @@ class BlogRepository extends ServiceEntityRepository
             ->setTitle($title)
             ->setBody($body)
             ->setAuthorId($authorId)
-            ->setCreatedAt(new DateTimeImmutable());
+            ->setCreatedAt(new DateTimeImmutable())
+            ->setPublishDate(new DateTimeImmutable($publishDate ?? "now"));
 
         $this->manager->persist($blog);
         $this->manager->flush();
@@ -64,5 +65,18 @@ class BlogRepository extends ServiceEntityRepository
         $this->manager->flush();
 
         return true;
+    }
+
+    public function findPublishedBlogs()
+    {
+        $queryBuilder = $this->createQueryBuilder('b');
+        $currentDate = new DateTimeImmutable();
+
+        $queryBuilder
+            ->andWhere($queryBuilder->expr()->lt('b.publishDate', ':currentDate'))
+            ->andWhere($queryBuilder->expr()->isNull('b.deletedAt'))
+            ->setParameter('currentDate', $currentDate);
+
+        return $queryBuilder->getQuery()->getResult();
     }
 }

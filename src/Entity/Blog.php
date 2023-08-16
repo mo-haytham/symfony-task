@@ -6,6 +6,9 @@ use App\Repository\BlogRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Mapping\ClassMetadata;
+
 #[ORM\Entity(repositoryClass: BlogRepository::class)]
 class Blog
 {
@@ -29,6 +32,9 @@ class Blog
 
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $publishDate = null;
 
     public function getId(): ?int
     {
@@ -91,6 +97,18 @@ class Blog
     public function setCreatedAt(\DateTimeImmutable $createdAt): static
     {
         $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    public function getPublishDate(): ?\DateTimeImmutable
+    {
+        return $this->publishDate;
+    }
+
+    public function setPublishDate(\DateTimeImmutable $publishDate): static
+    {
+        $this->publishDate = $publishDate;
 
         return $this;
     }

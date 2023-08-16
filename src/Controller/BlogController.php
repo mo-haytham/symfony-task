@@ -23,7 +23,7 @@ class BlogController extends AbstractController
     #[Route('/blogs', methods: ['GET'])]
     public function index(): JsonResponse
     {
-        $blogs = $this->blogRepository->findBy(['deletedAt' => null]);
+        $blogs = $this->blogRepository->findPublishedBlogs();
 
         $blogsArr = [];
         foreach ($blogs as $blog) {
@@ -35,9 +35,9 @@ class BlogController extends AbstractController
             ]);
         }
 
-        return $this->json('', 'success', [
+        return $this->json($this->prepareResponseArray('', 'success', [
             'blogs' => $blogsArr
-        ]);
+        ]));
     }
 
     #[Route('/blogs/create', methods: ['POST'])]
@@ -46,12 +46,16 @@ class BlogController extends AbstractController
         $requestContent = json_decode($request->getContent(), true);
         $title =  $requestContent['title'];
         $body =  $requestContent['body'];
+        $publishDate =  $requestContent['publishDate'] ?? date("Y-m-d");
+
+        // return $this->json($publishDate);
 
         $validationArray = [
             $this->validateInput('title', $title, 'varchar'),
             $this->validateInput('title', $title, 'required'),
             $this->validateInput('body', $body, 'text'),
             $this->validateInput('body', $body, 'required'),
+            $this->validateInput('publishDate', $publishDate, 'date'),
         ];
 
         foreach ($validationArray as $validation) {
@@ -61,7 +65,6 @@ class BlogController extends AbstractController
 
         try {
             $author = $this->validateUser($requestContent['email'], $requestContent['password']);
-            // return $this->json($this->prepareResponseArray($author, 'error'));
 
             if (!$author) {
                 return $this->json($this->prepareResponseArray('Unauthorized user', 'error'));
@@ -70,7 +73,8 @@ class BlogController extends AbstractController
             $blog = $this->blogRepository->saveBlog(
                 $title,
                 $body,
-                $author
+                $author,
+                $publishDate
             );
         } catch (\Throwable $th) {
             return $this->json($this->prepareResponseArray($th->getMessage(), 'error'));
@@ -80,6 +84,7 @@ class BlogController extends AbstractController
             'blog' => [
                 'title' => $blog->getTitle(),
                 'body' => $blog->getBody(),
+                'publishDate' => $blog->getPublishDate(),
             ],
         ]));
     }
@@ -87,21 +92,28 @@ class BlogController extends AbstractController
     #[Route('/blogs/{id}', methods: ['GET'])]
     public function show($id): JsonResponse
     {
-        $blog = $this->blogRepository->findOneBy(['id' => $id, 'deletedAt' => null]);
+        try {
+            $blog = $this->blogRepository->findOneBy(['id' => $id, 'deletedAt' => null]);
 
-        $blogArr = [];
-        if ($blog) {
-            $blogArr = [
-                'id' => $blog->getId(),
-                'title' => $blog->getTitle(),
-                'body' => $blog->getBody(),
-                'author' => $blog->getAuthorId()->getName(),
-            ];
+            $blogArr = [];
+            if ($blog) {
+                $blogArr = [
+                    'id' => $blog->getId(),
+                    'title' => $blog->getTitle(),
+                    'body' => $blog->getBody(),
+                    'author' => $blog->getAuthorId()->getName(),
+                    'publishDate' => $blog->getPublishDate(),
+                ];
+            }
+        } catch (\Throwable $th) {
+            return $this->json($this->prepareResponseArray($th->getMessage(), 'error'));
         }
 
-        return $this->json('', 'success', [
+
+
+        return $this->json($this->prepareResponseArray('', 'success', [
             'blog' => $blogArr,
-        ]);
+        ]));
     }
 
     #[Route('/blogs/{id}', methods: ['PUT'])]
@@ -127,13 +139,13 @@ class BlogController extends AbstractController
             $author = $this->validateUser($requestContent['email'], $requestContent['password']);
 
             if (!$author) {
-                return $this->json('Unauthorized user', 'error');
+                return $this->json($this->prepareResponseArray('Unauthorized user', 'error'));
             }
 
             $blog = $this->blogRepository->find(['id' => $id]);
 
             if (is_null($blog) || ($blog->getAuthorId() != $author->getId())) {
-                return $this->json('Unauthorized user or wrong data', 'error');
+                return $this->json($this->prepareResponseArray('Unauthorized user or wrong data', 'error'));
             }
 
             $blog = $this->blogRepository->updateBlog(
@@ -145,9 +157,9 @@ class BlogController extends AbstractController
             return $this->json($this->prepareResponseArray($th->getMessage(), 'error'));
         }
 
-        return $this->json('blog successfully updated', 'success', [
+        return $this->json($this->prepareResponseArray('blog successfully updated', 'success', [
             'blog' => $blog,
-        ]);
+        ]));
     }
 
     #[Route('/blogs/{id}', methods: ['DELETE'])]
@@ -160,7 +172,7 @@ class BlogController extends AbstractController
             $blog = $this->blogRepository->find(['id' => $id]);
 
             if ((is_null($blog) || !$author) && $blog->getAuthorId() != $author->getId()) {
-                return $this->json('Unauthorized user or wrong data', 'error');
+                return $this->json($this->prepareResponseArray('Unauthorized user or wrong data', 'error'));
             }
 
             $blog = $this->blogRepository->deleteBlog($id);
@@ -168,7 +180,7 @@ class BlogController extends AbstractController
             return $this->json($this->prepareResponseArray($th->getMessage(), 'error'));
         }
 
-        return $this->json('blog successfully deleted', 'success');
+        return $this->json($this->prepareResponseArray('blog successfully deleted', 'success'));
     }
 
     private function validateUser($email, $password)
@@ -199,13 +211,15 @@ class BlogController extends AbstractController
         switch ($rule) {
             case 'required':
                 return !empty($input) ? true : 'Input ' . $inputName . ' is required';
-                break;
             case 'text':
+                if (empty($input)) return true;
                 return is_string($input) ? true : 'Input ' . $inputName . ' must be a string';
-                break;
             case 'varchar':
+                if (empty($input)) return true;
                 return (is_string($input) && strlen($input) <= 255) ? true : 'Input ' . $inputName . ' must be a string with max length of 255 characters';
-                break;
+            case 'date':
+                if (empty($input)) return true;
+                return !(strtotime($input) === false) ? true : 'Input ' . $inputName . ' must be a date';
 
             default:
                 return true;
