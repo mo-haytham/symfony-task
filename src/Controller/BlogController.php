@@ -44,29 +44,44 @@ class BlogController extends AbstractController
     public function create(Request $request): JsonResponse
     {
         $requestContent = json_decode($request->getContent(), true);
+        $title =  $requestContent['title'];
+        $body =  $requestContent['body'];
+
+        $validationArray = [
+            $this->validateInput('title', $title, 'varchar'),
+            $this->validateInput('title', $title, 'required'),
+            $this->validateInput('body', $body, 'text'),
+            $this->validateInput('body', $body, 'required'),
+        ];
+
+        foreach ($validationArray as $validation) {
+            if ($validation !== true)
+                return $this->json($this->prepareResponseArray($validation, 'error'));
+        }
 
         try {
             $author = $this->validateUser($requestContent['email'], $requestContent['password']);
+            // return $this->json($this->prepareResponseArray($author, 'error'));
 
             if (!$author) {
-                return $this->json('Unauthorized user', 'error');
+                return $this->json($this->prepareResponseArray('Unauthorized user', 'error'));
             }
 
             $blog = $this->blogRepository->saveBlog(
-                $requestContent['title'],
-                $requestContent['body'],
+                $title,
+                $body,
                 $author
             );
         } catch (\Throwable $th) {
             return $this->json($this->prepareResponseArray($th->getMessage(), 'error'));
         }
 
-        return $this->json('blog successfully posted', 'success', [
+        return $this->json($this->prepareResponseArray('blog successfully posted', 'success', [
             'blog' => [
                 'title' => $blog->getTitle(),
                 'body' => $blog->getBody(),
             ],
-        ]);
+        ]));
     }
 
     #[Route('/blogs/{id}', methods: ['GET'])]
@@ -93,6 +108,20 @@ class BlogController extends AbstractController
     public function update(Request $request, $id): JsonResponse
     {
         $requestContent = json_decode($request->getContent(), true);
+        $title =  $requestContent['title'];
+        $body =  $requestContent['body'];
+
+        $validationArray = [
+            $this->validateInput('title', $title, 'varchar'),
+            $this->validateInput('title', $title, 'required'),
+            $this->validateInput('body', $body, 'text'),
+            $this->validateInput('body', $body, 'required'),
+        ];
+
+        foreach ($validationArray as $validation) {
+            if ($validation !== true)
+                return $this->json($this->prepareResponseArray($validation, 'error'));
+        }
 
         try {
             $author = $this->validateUser($requestContent['email'], $requestContent['password']);
@@ -109,8 +138,8 @@ class BlogController extends AbstractController
 
             $blog = $this->blogRepository->updateBlog(
                 $id,
-                $requestContent['title'],
-                $requestContent['body']
+                $$title,
+                $$body
             );
         } catch (\Throwable $th) {
             return $this->json($this->prepareResponseArray($th->getMessage(), 'error'));
@@ -145,10 +174,10 @@ class BlogController extends AbstractController
     private function validateUser($email, $password)
     {
         $author = $this->userRepository->findOneBy(['email' => $email]);
+        // return !empty($author);
         if (
-            $author &&
-            password_verify($password, $author->getPassword() &&
-                $author->getDeletedAt() == null)
+            $author && password_verify($password, $author->getPassword()) &&
+            $author->getDeletedAt() == null
         ) {
             return $author;
         } else {
@@ -163,5 +192,23 @@ class BlogController extends AbstractController
             'status' => $status,
             'data' => $data
         ];
+    }
+
+    private function validateInput($inputName, $input, $rule)
+    {
+        switch ($rule) {
+            case 'required':
+                return !empty($input) ? true : 'Input ' . $inputName . ' is required';
+                break;
+            case 'text':
+                return is_string($input) ? true : 'Input ' . $inputName . ' must be a string';
+                break;
+            case 'varchar':
+                return (is_string($input) && strlen($input) <= 255) ? true : 'Input ' . $inputName . ' must be a string with max length of 255 characters';
+                break;
+
+            default:
+                return true;
+        }
     }
 }

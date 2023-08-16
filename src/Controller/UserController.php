@@ -22,12 +22,29 @@ class UserController extends AbstractController
     public function register(Request $request): JsonResponse
     {
         $requestContent = json_decode($request->getContent(), true);
+        $name =  $requestContent['name'];
+        $email =  $requestContent['email'];
+        $password =  $requestContent['password'];
+
+        $validationResponseArray = [
+            $this->validateInput('name', $name, 'varchar'),
+            $this->validateInput('name', $name, 'required'),
+            $this->validateInput('email', $email, 'varchar'),
+            $this->validateInput('email', $email, 'required'),
+            $this->validateInput('password', $password, 'varchar'),
+            $this->validateInput('password', $password, 'required'),
+        ];
+
+        foreach ($validationResponseArray as $validationResponse) {
+            if ($validationResponse !== true)
+                return $this->json($this->prepareResponseArray($validationResponse, 'error'));
+        }
 
         try {
             $user = $this->userRepository->saveUser(
-                $requestContent['name'],
-                $requestContent['email'],
-                $requestContent['password'],
+                $name,
+                $email,
+                $password,
             );
         } catch (\Throwable $th) {
             return $this->json($this->prepareResponseArray($th->getMessage(), 'error'));
@@ -69,5 +86,20 @@ class UserController extends AbstractController
             'status' => $status,
             'data' => $data
         ];
+    }
+
+    private function validateInput($inputName, $input, $rule)
+    {
+        switch ($rule) {
+            case 'required':
+                return !empty($input) ? true : 'Input ' . $inputName . ' is required';
+                break;
+            case 'varchar':
+                return (is_string($input) && strlen($input) <= 255) ? true : 'Input ' . $inputName . ' must be a string with max length of 255 characters';
+                break;
+
+            default:
+                return true;
+        }
     }
 }
