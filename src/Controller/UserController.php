@@ -30,22 +30,44 @@ class UserController extends AbstractController
                 $requestContent['password'],
             );
         } catch (\Throwable $th) {
-            return $this->json([
-                'message' => $th->getMessage(),
-                'status' => 'error',
-                'data' => [],
-            ]);
+            return $this->json($this->prepareResponseArray($th->getMessage(), 'error'));
         }
 
-        return $this->json([
-            'message' => 'register success',
-            'status' => 'success',
-            'data' => [
-                'user' => [
-                    'name' => $user->getName(),
-                    'email' => $user->getEmail(),
-                ],
+        return $this->json($this->prepareResponseArray('register success', 'success', [
+            'user' => [
+                'name' => $user->getName(),
+                'email' => $user->getEmail(),
             ],
-        ]);
+        ]));
+    }
+
+    #[Route('/delete', methods: ['DELETE'])]
+    public function delete(Request $request): JsonResponse
+    {
+        $requestContent = json_decode($request->getContent(), true);
+
+        $author = $this->userRepository->findOneBy(['email' => $requestContent['email']]);
+
+        if ($author && password_verify($requestContent['password'], $author->getPassword())) {
+
+            try {
+                $author = $this->userRepository->deleteUser($author->getId());
+            } catch (\Throwable $th) {
+                return $this->json($this->prepareResponseArray($th->getMessage(), 'error'));
+            }
+
+            return $this->json($this->prepareResponseArray('user successfully deleted', 'success'));
+        } else {
+            return $this->json($this->prepareResponseArray('Unauthorized user', 'error'));
+        }
+    }
+
+    private function prepareResponseArray($message, $status, $data = [])
+    {
+        return [
+            'message' => $message,
+            'status' => $status,
+            'data' => $data
+        ];
     }
 }

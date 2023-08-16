@@ -35,12 +35,8 @@ class BlogController extends AbstractController
             ]);
         }
 
-        return $this->json([
-            'message' => '',
-            'status' => 'success',
-            'data' => [
-                'blogs' => $blogsArr
-            ],
+        return $this->json('', 'success', [
+            'blogs' => $blogsArr
         ]);
     }
 
@@ -53,11 +49,7 @@ class BlogController extends AbstractController
             $author = $this->validateUser($requestContent['email'], $requestContent['password']);
 
             if (!$author) {
-                return $this->json([
-                    'message' => 'Unauthorized user',
-                    'status' => 'error',
-                    'data' => [],
-                ]);
+                return $this->json('Unauthorized user', 'error');
             }
 
             $blog = $this->blogRepository->saveBlog(
@@ -66,21 +58,13 @@ class BlogController extends AbstractController
                 $author
             );
         } catch (\Throwable $th) {
-            return $this->json([
-                'message' => $th->getMessage(),
-                'status' => 'error',
-                'data' => [],
-            ]);
+            return $this->json($this->prepareResponseArray($th->getMessage(), 'error'));
         }
 
-        return $this->json([
-            'message' => 'blog successfully posted',
-            'status' => 'success',
-            'data' => [
-                'blog' => [
-                    'title' => $blog->getTitle(),
-                    'body' => $blog->getBody(),
-                ],
+        return $this->json('blog successfully posted', 'success', [
+            'blog' => [
+                'title' => $blog->getTitle(),
+                'body' => $blog->getBody(),
             ],
         ]);
     }
@@ -100,12 +84,8 @@ class BlogController extends AbstractController
             ];
         }
 
-        return $this->json([
-            'message' => '',
-            'status' => 'success',
-            'data' => [
-                'blog' => $blogArr,
-            ],
+        return $this->json('', 'success', [
+            'blog' => $blogArr,
         ]);
     }
 
@@ -116,14 +96,15 @@ class BlogController extends AbstractController
 
         try {
             $author = $this->validateUser($requestContent['email'], $requestContent['password']);
+
+            if (!$author) {
+                return $this->json('Unauthorized user', 'error');
+            }
+
             $blog = $this->blogRepository->find(['id' => $id]);
 
-            if ((is_null($blog) || !$author) && $blog->getAuthorId() != $author->getId()) {
-                return $this->json([
-                    'message' => 'Unauthorized user or wrong data',
-                    'status' => 'error',
-                    'data' => [],
-                ]);
+            if (is_null($blog) || ($blog->getAuthorId() != $author->getId())) {
+                return $this->json('Unauthorized user or wrong data', 'error');
             }
 
             $blog = $this->blogRepository->updateBlog(
@@ -132,19 +113,11 @@ class BlogController extends AbstractController
                 $requestContent['body']
             );
         } catch (\Throwable $th) {
-            return $this->json([
-                'message' => $th->getMessage(),
-                'status' => 'error',
-                'data' => [],
-            ]);
+            return $this->json($this->prepareResponseArray($th->getMessage(), 'error'));
         }
 
-        return $this->json([
-            'message' => 'blog successfully updated',
-            'status' => 'success',
-            'data' => [
-                'blog' => $blog,
-            ],
+        return $this->json('blog successfully updated', 'success', [
+            'blog' => $blog,
         ]);
     }
 
@@ -158,36 +131,37 @@ class BlogController extends AbstractController
             $blog = $this->blogRepository->find(['id' => $id]);
 
             if ((is_null($blog) || !$author) && $blog->getAuthorId() != $author->getId()) {
-                return $this->json([
-                    'message' => 'Unauthorized user or wrong data',
-                    'status' => 'error',
-                    'data' => [],
-                ]);
+                return $this->json('Unauthorized user or wrong data', 'error');
             }
 
             $blog = $this->blogRepository->deleteBlog($id);
         } catch (\Throwable $th) {
-            return $this->json([
-                'message' => $th->getMessage(),
-                'status' => 'error',
-                'data' => [],
-            ]);
+            return $this->json($this->prepareResponseArray($th->getMessage(), 'error'));
         }
 
-        return $this->json([
-            'message' => 'blog successfully deleted',
-            'status' => 'success',
-            'data' => [],
-        ]);
+        return $this->json('blog successfully deleted', 'success');
     }
 
     private function validateUser($email, $password)
     {
         $author = $this->userRepository->findOneBy(['email' => $email]);
-        if ($author && password_verify($password, $author->getPassword())) {
+        if (
+            $author &&
+            password_verify($password, $author->getPassword() &&
+                $author->getDeletedAt() == null)
+        ) {
             return $author;
         } else {
             return false;
         }
+    }
+
+    private function prepareResponseArray($message, $status, $data = [])
+    {
+        return [
+            'message' => $message,
+            'status' => $status,
+            'data' => $data
+        ];
     }
 }

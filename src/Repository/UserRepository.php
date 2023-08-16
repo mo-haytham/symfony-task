@@ -41,4 +41,16 @@ class UserRepository extends ServiceEntityRepository
 
         return $user;
     }
+
+    public function deleteUser($id)
+    {
+        $user = UserRepository::find($id);
+
+        $user->setDeletedAt(new DateTimeImmutable());
+
+        $this->manager->persist($user);
+        $this->manager->flush();
+
+        return true;
+    }
 }
